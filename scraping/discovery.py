@@ -1,5 +1,6 @@
 import re, os, time
 from typing import Dict, Any, List, Optional
+from urllib.parse import urlparse
 import aiohttp
 from bs4 import BeautifulSoup
 
@@ -58,11 +59,46 @@ async def _fetch(session:aiohttp.ClientSession, url:str):
     except Exception:
         return 0, ""
 
-def _pick_external_link(cell:BeautifulSoup):
+VENDOR_HOST_HINTS = ("sidearmsports.com","prestosports.com","wmt.digital","athletics","sports")
+ROSTER_PATH_HINTS = ("/sports/", "/roster", "/roster.aspx", "/roster?path=")
+
+def _best_external_link(cell:BeautifulSoup):
+    candidates = []
     for a in cell.find_all("a", href=True):
-        href=a["href"]
-        if href.startswith("http") and "wikipedia.org" not in href:
-            return href
+        href = a["href"]
+        if "wikipedia.org" in href:
+            continue
+        u = urlparse(href)
+        host = (u.netloc or "").lower()
+        path = (u.path or "").lower()
+        score = 0
+        if "athletics" in host or "athletics" in path or "sports" in host or "sports" in path:
+            score += 5
+        if any(v in host for v in VENDOR_HOST_HINTS):
+            score += 4
+        if any(h in path for h in ROSTER_PATH_HINTS):
+            score += 3
+        if host.endswith(".edu"):
+            score += 1
+        candidates.append((score, href))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+async def _try_roster(session, base_url, slug):
+    base = base_url.rstrip("/")
+    probes = [
+        f"{base}/sports/{slug}/roster",
+        f"{base}/{slug}/roster",
+        f"{base}/roster.aspx?path={slug}",
+        f"{base}/sports/{slug}",
+        f"{base}/{slug}",
+    ]
+    for cand in probes:
+        status2, html2 = await _fetch(session, cand)
+        if status2 == 200 and ("/roster" in cand.lower() or (html2 and "roster" in html2.lower())):
+            return cand
     return None
 
 async def discover_programs(sport:str, region:Optional[str]=None, states:Optional[List[str]]=None,
@@ -78,7 +114,7 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
     ttl=(cache_hours if cache_hours is not None else DEFAULT_DISCOVERY_CACHE_HOURS)*3600.0
     cached=discovery_cache.get(key, ttl)
     if cached is not None:
-        return {"count": len(cached["programs"]), "from_cache": True, **cached}
+        return {"count": len(cached['programs']), "from_cache": True, **cached}
     base="https://en.wikipedia.org/wiki/List_of_college_athletic_programs_in_{}"
     headers={"User-Agent":"Mozilla/5.0","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
     conn=aiohttp.TCPConnector(ssl=False, limit=10)
@@ -103,19 +139,15 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
                     elif re.search(r"NCAA", assoc_text, re.I):
                         assoc="NCAA"; m=re.search(r"Division\s+(I|II|III)", assoc_text, re.I)
                         if m: division=f"Division {m.group(1).upper()}"
-                    athletics=_pick_external_link(name_cell) or _pick_external_link(tr)
+                    athletics=_best_external_link(name_cell) or _best_external_link(tr)
                     if not athletics: continue
                     if assoc=="NCAA" and division=="Division III" and not include_diii: continue
                     if assoc=="NJCAA" and not include_njcaa: continue
                     roster_url=None
                     for slug in slugs:
-                        for cand in [athletics.rstrip("/")+f"/sports/{slug}/roster",
-                                     athletics.rstrip("/")+f"/{slug}/roster",
-                                     athletics.rstrip("/")+f"/roster.aspx?path={slug}"]:
-                            status2, html2=await _fetch(session,cand)
-                            if status2==200 and ("roster" in cand.lower() or (html2 and "roster" in html2.lower())):
-                                roster_url=cand; break
+                        roster_url = await _try_roster(session, athletics, slug)
                         if roster_url: break
+                    if not roster_url: continue
                     programs.append({
                         "school": name_cell.get_text(" ", strip=True),
                         "state": st,

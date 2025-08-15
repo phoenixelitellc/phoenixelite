@@ -29,8 +29,8 @@ class AsyncScraper:
                 r.raise_for_status(); return await r.text()
     def _guess_name_from_url(self, url:str)->str:
         try:
-            host=urlparse(url).netloc; core=(host.split(".")[-2] if len(host.split("."))>=2 else host)
-            return core.replace("-"," ").replace("_"," ").title()
+            host=urlparse(url).netloc; core=(host.split('.')[-2] if len(host.split('.'))>=2 else host)
+            return core.replace('-', ' ').replace('_', ' ').title()
         except Exception: return url
     def _extract_players_generic(self, soup:BeautifulSoup)->List[Dict[str,Any]]:
         players=[]; candidate_tables=soup.find_all("table"); roster_headers=("name","player","pos","position")
@@ -71,18 +71,8 @@ class AsyncScraper:
     async def scrape_school(self, identifier:str, sport:Optional[str]=None)->Dict[str,Any]:
         if not identifier: raise ValueError("Missing school identifier or URL")
         if not re.match(r"^https?://", identifier):
-            guesses=[f"https://{identifier}", f"https://{identifier}/roster", f"https://{identifier}.edu/roster",
-                     f"https://{identifier}.edu/sports/{(sport or 'mens-basketball').replace(' ','-')}/roster"]
-            last_exc=None
-            for g in guesses:
-                try:
-                    html=await self._get_html(g); soup=BeautifulSoup(html,"html.parser")
-                    players=self._extract_players_generic(soup)
-                    if players: return {"name":self._guess_name_from_url(g),"players":players,"source_url":g}
-                except Exception as e: last_exc=e; continue
-            if last_exc: raise last_exc
-            raise RuntimeError("Could not resolve school to a valid roster URL")
+            raise ValueError("Expected absolute roster URL")
         url=identifier; cached=_cache.get(url)
         if cached: return cached
         html=await self._get_html(url); soup=BeautifulSoup(html,"html.parser"); players=self._extract_players_generic(soup)
-        result={"name":self._guess_name_from_url(url),"players":players,"source_url":url}; _cache.set(url,result); return result
+        result={"name":self._guess_name_from_url(url), "players":players, "source_url":url}; _cache.set(url,result); return result
