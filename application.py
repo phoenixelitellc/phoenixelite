@@ -4,13 +4,13 @@ from pydantic import BaseModel
 from typing import List, Optional
 import aiohttp
 
-print("Phoenix Recruiting API import OK (v3.1.3)", flush=True)
+print("Phoenix Recruiting API import OK (v3.1.4)", flush=True)
 
 from scraping.async_scraper import AsyncScraper
 from scraping.discovery import discover_programs, discovery_cache
 from utils.scoring import calculate_graduation_year, calculate_recruiting_propensity, final_match_score
 
-app = FastAPI(title="Phoenix Recruiting API", version="3.1.3")
+app = FastAPI(title="Phoenix Recruiting API", version="3.1.4")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 scraper = AsyncScraper()
@@ -33,7 +33,7 @@ class MatchesRequest(BaseModel):
 async def root(): return {"ok": True}
 
 @app.get("/health")
-async def health(): return {"status": "ok", "version": "3.1.3"}
+async def health(): return {"status": "ok", "version": "3.1.4"}
 
 @app.get("/diag/ping")
 async def diag_ping():
@@ -74,12 +74,16 @@ async def matches(req: MatchesRequest, include_diii: bool = False, include_njcaa
     if not programs: raise HTTPException(status_code=404, detail="Could not discover roster URLs for that sport/region.")
     results=[]
     for p in programs:
-        roster_url = p.get("roster_url") or p.get("athletics_url")
+        roster_url = p.get("roster_url")
+        if not roster_url:
+            continue
         try:
             data = await scraper.scrape_school(roster_url, sport=req.sport)
         except Exception:
-            data = {"players": [], "source_url": roster_url, "name": p.get("school")}
+            continue
         players=data.get("players",[])
+        if not players:
+            continue
         pos=req.position.strip().lower()
         filtered=[pl for pl in players if pos and pos in (pl.get("position","").lower())] or players
         propensity=calculate_recruiting_propensity(filtered)
@@ -90,6 +94,8 @@ async def matches(req: MatchesRequest, include_diii: bool = False, include_njcaa
             "source_url": data.get("source_url") or roster_url,
             "players_considered": len(filtered), "propensity": propensity, "final_score": final
         })
+    if not results:
+        raise HTTPException(status_code=404, detail="No valid roster pages parsed for that sport/region.")
     results.sort(key=lambda x: x["final_score"], reverse=True)
     return {"count": len(results), "results": results,
             "discovery": {"count": disc.get("count"), "states": disc.get("states"), "sport_slugs": disc.get("sport_slugs")}}
