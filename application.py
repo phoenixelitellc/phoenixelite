@@ -4,13 +4,13 @@ from pydantic import BaseModel
 from typing import List, Optional
 import aiohttp
 
-print("Phoenix Recruiting API import OK (v3.1.2)", flush=True)
+print("Phoenix Recruiting API import OK (v3.1.3)", flush=True)
 
 from scraping.async_scraper import AsyncScraper
 from scraping.discovery import discover_programs, discovery_cache
 from utils.scoring import calculate_graduation_year, calculate_recruiting_propensity, final_match_score
 
-app = FastAPI(title="Phoenix Recruiting API", version="3.1.2")
+app = FastAPI(title="Phoenix Recruiting API", version="3.1.3")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 scraper = AsyncScraper()
@@ -33,7 +33,7 @@ class MatchesRequest(BaseModel):
 async def root(): return {"ok": True}
 
 @app.get("/health")
-async def health(): return {"status": "ok", "version": "3.1.2"}
+async def health(): return {"status": "ok", "version": "3.1.3"}
 
 @app.get("/diag/ping")
 async def diag_ping():

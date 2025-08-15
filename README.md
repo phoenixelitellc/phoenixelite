@@ -1,39 +1,25 @@
-# Phoenix Recruiting API (v3.1.2) — GitHub Repository
+# Phoenix Recruiting API (v3.1.3) — GitHub Repository
 
-This repo is ready for **Cloud Run: Deploy from repository**. You can use either **Buildpacks** (Procfile) or **Dockerfile**.
-Default path is **Buildpacks** via `Procfile`.
-
-## Layout
-- `application.py` — FastAPI app (`application:app`)
-- `scraping/`, `utils/` — modules with `__init__.py` for clean imports
-- `Procfile` — start command for buildpacks: `uvicorn application:app --port $PORT`
-- `requirements.txt` — pinned
-- `Dockerfile` + `start.sh` — if you choose Docker builds
-- `.github/workflows/cloud-run.yaml` — optional GitHub Actions example (disabled by default)
-
-## Deploy from GitHub (Buildpacks)
-1. Cloud Run → **Create Service** → **Deploy from repository**
-2. Select this GitHub repo + branch
-3. Build type: **Buildpack**
-4. No start command needed (Procfile is used)
-5. Variables (optional): `PYTHONFAULTHANDLER=1`
-6. **Create**
-
-## Deploy from GitHub (Dockerfile)
-1. Cloud Run → **Create Service** → **Deploy from repository**
-2. Select repo; Build type: **Dockerfile**
-3. **Create**
+Ready for Cloud Run **Deploy from repository**.
+- Buildpacks: uses `Procfile`
+- Dockerfile: uses shell-form `CMD` so `$PORT` expands
 
 ## Endpoints
 - `GET /` → `{"ok": true}`
-- `GET /health` → health/version
-- `GET /diag/ping` → external reachability check
+- `GET /health` → version/health
+- `GET /diag/ping` → egress test
 - `GET /discover?sport=football&region=West&cache_hours=1&diag=true`
-- `POST /matches` (JSON) → sorted list with propensity & final score
-- `POST /search` (JSON) → scrape known roster URL
+- `POST /matches` JSON: `{"sport":"football","position":"RB","class_level":"Senior","region":"West"}`
+- `POST /search`
 - `POST /webflow-submit` (form)
 
+## Deploy (Buildpacks)
+Cloud Run → Create service → Deploy from repository → Buildpack → Create.
+
+## Deploy (Dockerfile)
+Cloud Run → Create service → Deploy from repository → Dockerfile → Create.
+
 ## Notes
-- JUCO (NJCAA) is **excluded by default**. Use `include_njcaa=true` to include.
-- Discovery results are cached per (sport, region/states, flags) for `cache_hours` (default 24h).
-- Cache is **in-memory per instance**. Use `/cache/stats` and `/cache/clear` for visibility/control.
+- JUCO is excluded by default (`include_njcaa=false`) — pass `include_njcaa=true` to include.
+- Discovery cached per (sport, region/states, flags) for `cache_hours` (default 24h).
+- Cache is in-memory per instance.
