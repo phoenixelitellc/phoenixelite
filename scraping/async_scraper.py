@@ -73,7 +73,7 @@ class AsyncScraper:
         if not re.match(r"^https?://", identifier):
             guesses=[f"https://{identifier}", f"https://{identifier}/roster", f"https://{identifier}.edu/roster",
                      f"https://{identifier}.edu/sports/{(sport or 'mens-basketball').replace(' ','-')}/roster"]
-       	    last_exc=None
+            last_exc=None
             for g in guesses:
                 try:
                     html=await self._get_html(g); soup=BeautifulSoup(html,"html.parser")
