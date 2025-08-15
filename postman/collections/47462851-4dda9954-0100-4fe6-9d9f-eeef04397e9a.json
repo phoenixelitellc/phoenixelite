@@ -1,0 +1,134 @@
+{
+	"info": {
+		"_postman_id": "47462851-4dda9954-0100-4fe6-9d9f-eeef04397e9a",
+		"name": "Phoenix Recruiting API - Smoke Tests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "GET /",
+			"id": "47462851-1e14b26b-3680-4554-8085-e80742f3072f",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET /health",
+			"id": "47462851-a083ca81-34e3-4353-9af5-5dce68c1576d",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET /discover (football West)",
+			"id": "47462851-e3da130f-ba37-48a8-ba65-710e2b7bcdcb",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/discover?sport=football&region=West&cache_hours=1&diag=true",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"discover"
+					],
+					"query": [
+						{
+							"key": "sport",
+							"value": "football"
+						},
+						{
+							"key": "region",
+							"value": "West"
+						},
+						{
+							"key": "cache_hours",
+							"value": "1"
+						},
+						{
+							"key": "diag",
+							"value": "true"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST /matches (RB Senior West)",
+			"id": "47462851-7bd869fa-6d8b-457d-bcf4-deaba1776761",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sport\": \"football\",\n  \"position\": \"RB\",\n  \"class_level\": \"Senior\",\n  \"region\": \"West\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/matches?include_diii=false&include_njcaa=false&cache_hours=1",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"matches"
+					],
+					"query": [
+						{
+							"key": "include_diii",
+							"value": "false"
+						},
+						{
+							"key": "include_njcaa",
+							"value": "false"
+						},
+						{
+							"key": "cache_hours",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
