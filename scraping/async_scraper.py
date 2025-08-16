@@ -75,4 +75,5 @@ class AsyncScraper:
         url=identifier; cached=_cache.get(url)
         if cached: return cached
         html=await self._get_html(url); soup=BeautifulSoup(html,"html.parser"); players=self._extract_players_generic(soup)
-        result={"name":self._guess_name_from_url(url), "players":players, "source_url":url}; _cache.set(url,result); return result
+        result={"name":self._guess_name_from_url(url), "players":players, "source_url":url}
+        _cache.set(url,result); return result

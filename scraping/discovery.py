@@ -1,9 +1,10 @@
 import re, os, time
-from typing import Dict, Any, List, Optional
-from urllib.parse import urlparse
+from typing import Dict, Any, List, Optional, Tuple
+from urllib.parse import urlparse, urljoin
 import aiohttp
 from bs4 import BeautifulSoup
 
+APP_VERSION = os.getenv("APP_VERSION", "3.1.5a")
 DEFAULT_DISCOVERY_CACHE_HOURS = float(os.getenv("DISCOVERY_CACHE_HOURS", "24"))
 
 SPORT_SLUGS: Dict[str, List[str]] = {
@@ -52,7 +53,7 @@ def _sport_slugs(sport:str)->List[str]:
     s=sport.strip().lower()
     return SPORT_SLUGS.get(s,[re.sub(r"\s+","-",s)])
 
-async def _fetch(session:aiohttp.ClientSession, url:str):
+async def _fetch(session:aiohttp.ClientSession, url:str)->Tuple[int,str]:
     try:
         async with session.get(url) as resp:
             return resp.status, await resp.text()
@@ -62,7 +63,7 @@ async def _fetch(session:aiohttp.ClientSession, url:str):
 VENDOR_HOST_HINTS = ("sidearmsports.com","prestosports.com","wmt.digital","athletics","sports")
 ROSTER_PATH_HINTS = ("/sports/", "/roster", "/roster.aspx", "/roster?path=")
 
-def _best_external_link(cell:BeautifulSoup):
+def _best_external_link(cell:BeautifulSoup)->Optional[str]:
     candidates = []
     for a in cell.find_all("a", href=True):
         href = a["href"]
@@ -83,6 +84,60 @@ def _best_external_link(cell:BeautifulSoup):
         candidates.append((score, href))
     if not candidates:
         return None
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+def _abs_wiki(url:str)->str:
+    if url.startswith("/wiki/"):
+        return "https://en.wikipedia.org" + url
+    return url
+
+def _pick_school_wiki(cell:BeautifulSoup)->Optional[str]:
+    a = cell.find("a", href=True)
+    if not a: return None
+    href=a["href"]
+    if href.startswith("http") or href.startswith("/wiki/"):
+        return _abs_wiki(href)
+    return None
+
+async def _resolve_website_from_school_wiki(session:aiohttp.ClientSession, school_wiki_url:str)->Optional[str]:
+    status, html = await _fetch(session, school_wiki_url)
+    if status != 200 or not html: return None
+    soup = BeautifulSoup(html, "html.parser")
+    box = soup.find("table", class_=lambda x: x and "infobox" in x)
+    if box:
+        for a in box.find_all("a", href=True):
+            href=a["href"]
+            if href.startswith("http") and "wikipedia.org" not in href:
+                if urlparse(href).netloc.endswith(".edu"):
+                    return href
+    for a in soup.find_all("a", href=True):
+        href=a["href"]
+        if href.startswith("http") and "wikipedia.org" not in href:
+            if urlparse(href).netloc.endswith(".edu"):
+                return href
+    return None
+
+async def _guess_athletics_from_homepage(session:aiohttp.ClientSession, website_url:str)->Optional[str]:
+    status, html = await _fetch(session, website_url)
+    if status != 200 or not html: return None
+    soup = BeautifulSoup(html, "html.parser")
+    candidates=[]
+    for a in soup.find_all("a", href=True):
+        text=" ".join(a.get_text(" ", strip=True).split()).lower()
+        href=a["href"]
+        href_l=href.lower()
+        if ("athletic" in text or "athletics" in text or "sports" in text or "athletic" in href_l or "athletics" in href_l or "sports" in href_l):
+            abs_url = urljoin(website_url, href)
+            u = urlparse(abs_url)
+            if "wikipedia.org" in abs_url: 
+                continue
+            score = 0
+            if any(v in (u.netloc or "").lower() for v in VENDOR_HOST_HINTS): score += 3
+            if any(h in (u.path or "").lower() for h in ROSTER_PATH_HINTS): score += 2
+            if "athletics" in (u.netloc or "").lower() or "athletics" in (u.path or "").lower(): score += 2
+            candidates.append((score, abs_url))
+    if not candidates: return None
     candidates.sort(reverse=True)
     return candidates[0][1]
 
@@ -110,7 +165,7 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
         r=_normalize_region(region) if region else None
         if not r: raise ValueError("Provide a valid region or states list")
         states=REGION_STATES[r]
-    key=f"disc::{','.join(states)}::{','.join(slugs)}::diii={include_diii}::njcaa={include_njcaa}"
+    key=f"{APP_VERSION}::disc::{','.join(states)}::{','.join(slugs)}::diii={include_diii}::njcaa={include_njcaa}"
     ttl=(cache_hours if cache_hours is not None else DEFAULT_DISCOVERY_CACHE_HOURS)*3600.0
     cached=discovery_cache.get(key, ttl)
     if cached is not None:
@@ -119,7 +174,7 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
     headers={"User-Agent":"Mozilla/5.0","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
     conn=aiohttp.TCPConnector(ssl=False, limit=10)
     programs=[]; diag_fetch=[]
-    async with aiohttp.ClientSession(connector=conn, timeout=aiohttp.ClientTimeout(total=20), headers=headers) as session:
+    async with aiohttp.ClientSession(connector=conn, timeout=aiohttp.ClientTimeout(total=25), headers=headers) as session:
         for st in states:
             url=base.format(STATE_NAMES[st].replace(' ','_'))
             status,html=await _fetch(session,url)
@@ -128,7 +183,9 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
             soup=BeautifulSoup(html,"html.parser")
             tables=soup.find_all("table", class_=lambda x: x and "wikitable" in x)
             for table in tables:
-                for tr in table.find_all("tr")[1:]:
+                rows = table.find_all("tr")
+                if not rows: continue
+                for tr in rows[1:]:
                     tds=tr.find_all("td")
                     if not tds: continue
                     name_cell=tds[0]
@@ -140,7 +197,14 @@ async def discover_programs(sport:str, region:Optional[str]=None, states:Optiona
                         assoc="NCAA"; m=re.search(r"Division\s+(I|II|III)", assoc_text, re.I)
                         if m: division=f"Division {m.group(1).upper()}"
                     athletics=_best_external_link(name_cell) or _best_external_link(tr)
-                    if not athletics: continue
+                    if not athletics:
+                        school_wiki=_pick_school_wiki(name_cell)
+                        if school_wiki:
+                            website=await _resolve_website_from_school_wiki(session, school_wiki)
+                            if website:
+                                athletics=await _guess_athletics_from_homepage(session, website)
+                    if not athletics: 
+                        continue
                     if assoc=="NCAA" and division=="Division III" and not include_diii: continue
                     if assoc=="NJCAA" and not include_njcaa: continue
                     roster_url=None
