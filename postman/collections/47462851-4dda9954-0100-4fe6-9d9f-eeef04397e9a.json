@@ -157,21 +157,7 @@
 				"method": "GET",
 				"header": []
 			},
-			"response": [
-				{
-					"id": "47462851-29a94742-89d0-4c6d-b9c1-8edc52a023ee",
-					"name": "POST /rebuild-index",
-					"originalRequest": {
-						"method": "GET",
-						"header": []
-					},
-					"_postman_previewlanguage": null,
-					"header": null,
-					"cookie": [],
-					"responseTime": null,
-					"body": null
-				}
-			]
+			"response": []
 		},
 		{
 			"name": "GET /cache/clear",
