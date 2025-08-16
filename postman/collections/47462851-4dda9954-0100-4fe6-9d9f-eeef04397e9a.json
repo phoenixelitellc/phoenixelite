@@ -149,6 +149,46 @@
 			"response": []
 		},
 		{
+			"name": "POST /matches (RB Senior West) Copy",
+			"id": "47462851-33f006f6-d5d2-400a-b01e-7ef416aec4e7",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sport\": \"football\",\n  \"position\": \"RB\",\n  \"class_level\": \"Senior\",\n  \"region\": \"West\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/matches?sources=governing,vendors,wiki&cache_hours=0",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"matches"
+					],
+					"query": [
+						{
+							"key": "sources",
+							"value": "governing,vendors,wiki"
+						},
+						{
+							"key": "cache_hours",
+							"value": "0"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "POST /rebuild-index",
 			"id": "47462851-7948d529-f0a0-4aad-93a5-b674c94e0f00",
 			"protocolProfileBehavior": {
