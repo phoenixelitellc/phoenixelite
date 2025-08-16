@@ -149,7 +149,7 @@
 			"response": []
 		},
 		{
-			"name": "rebuild-index",
+			"name": "POST /rebuild-index",
 			"id": "47462851-33f006f6-d5d2-400a-b01e-7ef416aec4e7",
 			"protocolProfileBehavior": {
 				"disableBodyPruning": true
