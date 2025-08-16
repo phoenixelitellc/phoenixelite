@@ -199,6 +199,18 @@
 				"header": []
 			},
 			"response": []
+		},
+		{
+			"name": "GET /cache/clear Copy",
+			"id": "47462851-d2275e43-5651-45c0-b318-1af0c8d32efc",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
 		}
 	]
 }
