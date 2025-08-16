@@ -126,7 +126,7 @@
 					"raw": "{\n  \"sport\": \"football\",\n  \"position\": \"RB\",\n  \"class_level\": \"Senior\",\n  \"region\": \"West\"\n}"
 				},
 				"url": {
-					"raw": "{{baseUrl}}/matches?include_diii=false&include_njcaa=false&cache_hours=1",
+					"raw": "{{baseUrl}}/matches?sources=governing,vendors,wiki&cache_hours=0",
 					"host": [
 						"{{baseUrl}}"
 					],
@@ -135,16 +135,12 @@
 					],
 					"query": [
 						{
-							"key": "include_diii",
-							"value": "false"
-						},
-						{
-							"key": "include_njcaa",
-							"value": "false"
+							"key": "sources",
+							"value": "governing,vendors,wiki"
 						},
 						{
 							"key": "cache_hours",
-							"value": "1"
+							"value": "0"
 						}
 					]
 				}
