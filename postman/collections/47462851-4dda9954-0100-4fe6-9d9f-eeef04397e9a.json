@@ -148,8 +148,8 @@
 			"response": []
 		},
 		{
-			"name": "GET /cache/clear",
-			"id": "47462851-713108d4-8482-410d-baa9-30d0e6214148",
+			"name": "New Request",
+			"id": "47462851-7948d529-f0a0-4aad-93a5-b674c94e0f00",
 			"protocolProfileBehavior": {
 				"disableBodyPruning": true
 			},
@@ -160,8 +160,8 @@
 			"response": []
 		},
 		{
-			"name": "New Request",
-			"id": "47462851-7948d529-f0a0-4aad-93a5-b674c94e0f00",
+			"name": "GET /cache/clear",
+			"id": "47462851-713108d4-8482-410d-baa9-30d0e6214148",
 			"protocolProfileBehavior": {
 				"disableBodyPruning": true
 			},
