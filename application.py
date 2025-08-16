@@ -1,17 +1,18 @@
+
 from fastapi import FastAPI, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-import aiohttp
+import aiohttp, os
 
-print("Phoenix Recruiting API import OK (v3.1.4)", flush=True)
+APP_VERSION = os.getenv("APP_VERSION", "3.1.5a")
+print("Phoenix Recruiting API import OK (v%s)" % APP_VERSION, flush=True)
 
 from scraping.async_scraper import AsyncScraper
-from scraping.discovery import discover_programs, discovery_cache
+from scraping.discovery import discover_programs, discovery_cache, APP_VERSION as DISCOVERY_VERSION
 from utils.scoring import calculate_graduation_year, calculate_recruiting_propensity, final_match_score
 
-app = FastAPI(title="Phoenix Recruiting API", version="3.1.4")
-
+app = FastAPI(title="Phoenix Recruiting API", version=APP_VERSION)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 scraper = AsyncScraper()
 
@@ -29,26 +30,24 @@ class MatchesRequest(BaseModel):
     states: Optional[List[str]] = None
     debug: Optional[bool] = False
 
+def _meta(d: dict) -> dict:
+    d.setdefault("_meta", {})["app_version"] = APP_VERSION
+    return d
+
 @app.get("/")
-async def root(): return {"ok": True}
+async def root(): return _meta({"ok": True})
 
 @app.get("/health")
-async def health(): return {"status": "ok", "version": "3.1.4"}
-
-@app.get("/diag/ping")
-async def diag_ping():
-    try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get("https://en.wikipedia.org/wiki/Main_Page") as r:
-                return {"status": r.status}
-    except Exception as e:
-        return {"status": 0, "error": str(e)}
+async def health(): return _meta({"status":"ok","version":APP_VERSION,"discovery_version":DISCOVERY_VERSION})
 
 @app.get("/cache/stats")
-async def cache_stats(): return discovery_cache.stats()
+async def cache_stats(): return _meta(discovery_cache.stats())
 
 @app.post("/cache/clear")
-async def cache_clear(): discovery_cache.clear(); return {"ok": True}
+async def cache_clear_post(): discovery_cache.clear(); return _meta({"ok": True})
+
+@app.get("/cache/clear")
+async def cache_clear_get(): discovery_cache.clear(); return _meta({"ok": True})
 
 @app.get("/discover")
 async def discover(
@@ -62,7 +61,8 @@ async def discover(
     diag: bool = False,
 ):
     states_list = [x.strip().upper() for x in states.split(",")] if states else ([state.strip().upper()] if state else None)
-    return await discover_programs(sport, region, states_list, include_diii, include_njcaa, cache_hours, diag)
+    res = await discover_programs(sport, region, states_list, include_diii, include_njcaa, cache_hours, diag)
+    return _meta(res)
 
 @app.post("/matches")
 async def matches(req: MatchesRequest, include_diii: bool = False, include_njcaa: bool = False, cache_hours: Optional[float] = None):
@@ -75,15 +75,13 @@ async def matches(req: MatchesRequest, include_diii: bool = False, include_njcaa
     results=[]
     for p in programs:
         roster_url = p.get("roster_url")
-        if not roster_url:
-            continue
+        if not roster_url: continue
         try:
             data = await scraper.scrape_school(roster_url, sport=req.sport)
         except Exception:
             continue
         players=data.get("players",[])
-        if not players:
-            continue
+        if not players: continue
         pos=req.position.strip().lower()
         filtered=[pl for pl in players if pos and pos in (pl.get("position","").lower())] or players
         propensity=calculate_recruiting_propensity(filtered)
@@ -94,33 +92,7 @@ async def matches(req: MatchesRequest, include_diii: bool = False, include_njcaa
             "source_url": data.get("source_url") or roster_url,
             "players_considered": len(filtered), "propensity": propensity, "final_score": final
         })
-    if not results:
-        raise HTTPException(status_code=404, detail="No valid roster pages parsed for that sport/region.")
+    if not results: raise HTTPException(status_code=404, detail="No valid roster pages parsed for that sport/region.")
     results.sort(key=lambda x: x["final_score"], reverse=True)
-    return {"count": len(results), "results": results,
-            "discovery": {"count": disc.get("count"), "states": disc.get("states"), "sport_slugs": disc.get("sport_slugs")}}
-
-@app.post("/search")
-async def search(req: SearchRequest):
-    if not req.url and not req.school:
-        raise HTTPException(status_code=400, detail="Provide either 'url' or 'school'.")
-    try:
-        data = await scraper.scrape_school(req.url or req.school, sport=req.sport)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scrape error: {e}")
-    if req.class_level: _ = calculate_graduation_year(req.class_level)
-    score = calculate_recruiting_propensity(data.get("players", []))
-    return {"name": data.get("name") or (req.school or "Unknown"),
-            "players": data.get("players", []), "recruiting_score": score,
-            "source_url": data.get("source_url")}
-
-@app.post("/webflow-submit")
-async def webflow_submit(school: str = Form(None), url: str = Form(None), sport: str = Form(None), class_level: str = Form(None)):
-    try:
-        data = await scraper.scrape_school(url or school, sport=sport)
-        score = calculate_recruiting_propensity(data.get("players", []))
-        grad_year = calculate_graduation_year(class_level) if class_level else None
-        return {"ok": True, "school": data.get("name") or school, "players_found": len(data.get("players", [])),
-                "recruiting_score": score, "graduation_year": grad_year, "source_url": data.get("source_url")}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving matches: {e}")    
+    return _meta({"count": len(results), "results": results,
+                   "discovery": {"count": disc.get("count"), "states": disc.get("states"), "sport_slugs": disc.get("sport_slugs")}})
