@@ -4,9 +4,9 @@ from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlparse, urljoin
 import aiohttp
 from bs4 import BeautifulSoup
-from utils.regions import REGION_STATES, REGION_SYNONYMS, STATE_NAMES, normalize_region
+from utils.regions import REGION_STATES, STATE_NAMES, normalize_region
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.0")
+APP_VERSION = os.getenv("APP_VERSION", "3.2.1")
 DEFAULT_DISCOVERY_CACHE_HOURS = float(os.getenv("DISCOVERY_CACHE_HOURS", "24"))
 
 VENDOR_HOST_HINTS = (
@@ -218,13 +218,9 @@ def _filter_association(rec:Dict[str,Any], include_diii:bool, include_njcaa:bool
     return True
 
 async def _enum_programs(session, states:List[str], sources:List[str])->List[Dict[str,Any]]:
-    # For now, "governing" uses state lists (Wikipedia) as a stable seed. 
-    # We keep a placeholder to add NCAA/NAIA/NJCAA APIs later.
     records=[]
     if "governing" in sources or "wiki" in sources:
         records.extend(await _enum_from_wikipedia(session, states))
-    # ESPN enumeration stub (optional): currently off unless explicitly included; not required for correctness.
-    # If added in future, records += await _enum_from_espn(...)
     return records
 
 async def discover_programs(
@@ -250,9 +246,7 @@ async def discover_programs(
     conn=aiohttp.TCPConnector(ssl=False, limit=10)
     programs=[]; diag_fetch=[]
     async with aiohttp.ClientSession(connector=conn, timeout=aiohttp.ClientTimeout(total=30), headers=headers) as session:
-        # 1) Enumerate candidate schools (governing/wiki)
         records = await _enum_programs(session, states, srcs)
-        # 2) Resolve athletics domains (vendors/homepage/wiki-derivations)
         for rec in records:
             if not _filter_association(rec, include_diii, include_njcaa): 
                 continue
@@ -275,7 +269,6 @@ async def rebuild_index(
     sport:str, region:Optional[str]=None, states:Optional[List[str]]=None, sources:str="governing,vendors,wiki",
     include_diii:bool=False, include_njcaa:bool=False, cache_hours:Optional[float]=None, diag:bool=False
 )->Dict[str,Any]:
-    # Force a fresh discover and cache the result
     res = await discover_programs(
         sport=sport, region=region, states=states, sources=sources,
         include_diii=include_diii, include_njcaa=include_njcaa, cache_hours=0, diag=diag
