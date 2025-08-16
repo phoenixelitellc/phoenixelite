@@ -27,6 +27,27 @@
 			"response": []
 		},
 		{
+			"name": "GET / Copy",
+			"id": "47462851-5f73492e-a0c2-420d-9864-ff1a6c28ef5c",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "GET /health",
 			"id": "47462851-a083ca81-34e3-4353-9af5-5dce68c1576d",
 			"protocolProfileBehavior": {
