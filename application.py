@@ -1,20 +1,48 @@
 
-from fastapi import FastAPI, HTTPException, Header, Query
+import os, sys, json, traceback
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-import os
 
-APP_VERSION = os.getenv("APP_VERSION", "3.2.0")
+APP_VERSION = os.getenv("APP_VERSION", "3.2.1")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
-from scraping.async_scraper import AsyncScraper
-from scraping.discovery import discover_programs, discovery_cache, rebuild_index
-from utils.scoring import calculate_recruiting_propensity, final_match_score
+print("=== Phoenix Recruiting boot ===", flush=True)
+print("APP_VERSION=", APP_VERSION, flush=True)
+print("PYTHONPATH=", os.getenv("PYTHONPATH"), flush=True)
+
+# Import with graceful fallback so the server always binds to PORT
+IMPORT_ISSUES = {}
+try:
+    from scraping.async_scraper import AsyncScraper
+except Exception as e:
+    IMPORT_ISSUES["async_scraper"] = str(e)
+    AsyncScraper = None
+
+try:
+    from scraping.discovery import discover_programs, discovery_cache, rebuild_index
+except Exception as e:
+    IMPORT_ISSUES["discovery"] = str(e)
+    discover_programs = None
+    class _NullCache:
+        def clear(self): pass
+        def stats(self): return {"size":0}
+    discovery_cache = _NullCache()
+    async def rebuild_index(**kwargs):
+        return {"ok": False, "error":"discovery unavailable", "kwargs": kwargs}
+
+try:
+    from utils.scoring import calculate_recruiting_propensity, final_match_score
+except Exception as e:
+    IMPORT_ISSUES["scoring"] = str(e)
+    def calculate_recruiting_propensity(players): return 0.5
+    def final_match_score(prop, class_level): return 50.0
 
 app = FastAPI(title="Phoenix Recruiting API", version=APP_VERSION)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-scraper = AsyncScraper()
+
+scraper = AsyncScraper() if AsyncScraper else None
 
 class MatchesRequest(BaseModel):
     sport: str
@@ -26,28 +54,29 @@ class MatchesRequest(BaseModel):
 
 def _meta(d: dict) -> dict:
     d.setdefault("_meta", {})["app_version"] = APP_VERSION
+    if IMPORT_ISSUES: d["_meta"]["import_issues"] = IMPORT_ISSUES
     return d
 
 @app.get("/")
-async def root(): 
+async def root():
     return _meta({"ok": True})
 
 @app.get("/health")
-async def health(): 
+async def health():
     return _meta({"status":"ok"})
 
 @app.get("/cache/stats")
-async def cache_stats(): 
+async def cache_stats():
     return _meta(discovery_cache.stats())
 
 @app.get("/cache/clear")
-async def cache_clear_get(): 
-    discovery_cache.clear(); 
+async def cache_clear_get():
+    discovery_cache.clear()
     return _meta({"ok": True})
 
 @app.post("/cache/clear")
-async def cache_clear_post(): 
-    discovery_cache.clear(); 
+async def cache_clear_post():
+    discovery_cache.clear()
     return _meta({"ok": True})
 
 @app.post("/rebuild-index")
@@ -64,6 +93,8 @@ async def rebuild_index_endpoint(
 ):
     if ADMIN_TOKEN and x_admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    if not rebuild_index:
+        raise HTTPException(status_code=503, detail="Indexing unavailable (discovery import failed)")
     states_list = [x.strip().upper() for x in states.split(",")] if states else None
     payload = await rebuild_index(
         sport=sport, region=region, states=states_list, sources=sources,
@@ -83,6 +114,8 @@ async def discover(
     cache_hours: Optional[float] = None,
     diag: bool = False,
 ):
+    if not discover_programs:
+        raise HTTPException(status_code=503, detail="Discovery unavailable (import failed)")
     states_list = [x.strip().upper() for x in states.split(",")] if states else ([state.strip().upper()] if state else None)
     res = await discover_programs(
         sport=sport, region=region, states=states_list, sources=sources,
@@ -98,6 +131,8 @@ async def matches(
     include_njcaa: bool = False,
     cache_hours: Optional[float] = None
 ):
+    if not (discover_programs and scraper):
+        raise HTTPException(status_code=503, detail="Service unavailable (imports failed)")
     try:
         disc = await discover_programs(
             sport=req.sport, region=req.region, states=req.states, sources=sources,
