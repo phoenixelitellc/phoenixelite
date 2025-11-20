@@ -22,7 +22,7 @@ steps:
       ]
   # 4) Google Cloud Logging
   - name: 'bash'
-    logsBucket: 'gs://mylogsbucket'
+    logsBucket: 'gs://phoenix-elite-build-logs/'
     serviceAccount: 'projects/second-folio-468704-a5/serviceAccounts/678849162920-compute@developer.gserviceaccount.com'
     options:
       logging: GCS_ONLY
