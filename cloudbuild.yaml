@@ -20,12 +20,11 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated"
       ]
-  # 4) Google Cloud Logging
-  - name: 'bash'
-    logsBucket: 'gs://phoenix-elite-build-logs/'
-    serviceAccount: 'projects/second-folio-468704-a5/serviceAccounts/678849162920-compute@developer.gserviceaccount.com'
-    options:
-      logging: GCS_ONLY
+
+# 👇 NEW: these are *top-level* fields, NOT a step
+logsBucket: "gs://phoenix-elite-build-logs"
+options:
+  logging: GCS_ONLY
 
 substitutions:
   _SERVICE_NAME: phoenix-backend
