@@ -1,0 +1,41 @@
+# cloudbuild.yaml at repo root
+
+steps:
+  # 1) Build the container image from the Dockerfile
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - '-t'
+      - '${_IMAGE_NAME}'
+      - '.'
+
+  # 2) Push the image to Artifact Registry / Container Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - '${_IMAGE_NAME}'
+
+  # 3) Deploy to Cloud Run
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_IMAGE_NAME}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      # optionally: '--memory=512Mi', '--concurrency=10', etc.
+
+substitutions:
+  # Customize these defaults to your environment
+  _SERVICE_NAME: phoenix-backend
+  _REGION: us-west1
+  _IMAGE_NAME: us-west1-docker.pkg.dev/$PROJECT_ID/phoenix-backend/phoenix-backend:latest
+    # or: gcr.io/$PROJECT_ID/phoenix-backend:latest if using Container Registry
+
+images:
+  - '${_IMAGE_NAME}'
