@@ -20,6 +20,12 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated"
       ]
+  # 4) Google Cloud Logging
+  - name: 'bash'
+    logsBucket: 'gs://mylogsbucket'
+    serviceAccount: 'projects/second-folio-468704-a5/serviceAccounts/678849162920-compute@developer.gserviceaccount.com'
+    options:
+      logging: GCS_ONLY
 
 substitutions:
   _SERVICE_NAME: phoenix-backend
