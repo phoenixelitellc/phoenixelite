@@ -1,41 +1,30 @@
-# cloudbuild.yaml at repo root
+# cloudbuild.yaml
 
 steps:
-  # 1) Build the container image from the Dockerfile
+  # 1) Build the image using your Dockerfile
   - name: gcr.io/cloud-builders/docker
-    args:
-      - build
-      - '-t'
-      - '${_IMAGE_NAME}'
-      - '.'
+    args: ["build", "-t", "${_IMAGE_NAME}", "."]
 
-  # 2) Push the image to Artifact Registry / Container Registry
+  # 2) Push the image to Artifact Registry
   - name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - '${_IMAGE_NAME}'
+    args: ["push", "${_IMAGE_NAME}"]
 
-  # 3) Deploy to Cloud Run
+  # 3) Deploy the image to Cloud Run
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
-      - run
-      - deploy
-      - '${_SERVICE_NAME}'
-      - '--image'
-      - '${_IMAGE_NAME}'
-      - '--region'
-      - '${_REGION}'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      # optionally: '--memory=512Mi', '--concurrency=10', etc.
+      [
+        "run", "deploy", "${_SERVICE_NAME}",
+        "--image", "${_IMAGE_NAME}",
+        "--region", "${_REGION}",
+        "--platform", "managed",
+        "--allow-unauthenticated"
+      ]
 
 substitutions:
-  # Customize these defaults to your environment
   _SERVICE_NAME: phoenix-backend
   _REGION: us-west1
-  _IMAGE_NAME: us-west1-docker.pkg.dev/$PROJECT_ID/phoenix-backend/phoenix-backend:latest
-    # or: gcr.io/$PROJECT_ID/phoenix-backend:latest if using Container Registry
+  _IMAGE_NAME: us-west1-docker.pkg.dev/second-folio-468704-a5/phoenix-backend/phoenix-backend:latest
 
 images:
-  - '${_IMAGE_NAME}'
+  - "${_IMAGE_NAME}"
